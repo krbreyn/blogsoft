@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	_ "embed"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +14,14 @@ import (
 //var blog_dir = os.Getenv("BLOG_DIR")
 
 func main() {
+	base_t := template.New("base")
+	base_t = template.Must(base_t.Parse(BaseTmpl))
+	index_t := template.New("index")
+	index_t = template.Must(index_t.Parse(IndexTmpl))
+	post_t := template.New("post")
+	post_t = template.Must(post_t.Parse(PostTmpl))
+
+	templates := Templates{base_t, index_t, post_t}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +41,7 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
-		w.Write([]byte(RenderPostPage(post)))
+		w.Write([]byte(RenderPostPage(post, templates)))
 	})
 
 	srv := &http.Server{
@@ -53,7 +63,7 @@ func main() {
 type BlogPost struct {
 	Title   string
 	Date    string
-	Tags    string
+	Tags    []string
 	Content string
 }
 
@@ -77,7 +87,15 @@ func OpenBlogPost(filename string) (BlogPost, error) {
 	s.Scan()
 	date := s.Text()
 	s.Scan()
-	tags := s.Text()
+	var tags []string
+	tag_line := s.Text()
+	if tag_line != "" {
+		str := strings.TrimPrefix(tag_line, "[[tags: ")
+		if str != tag_line {
+			str := strings.TrimSuffix(str, "]]")
+			tags = strings.Fields(str)
+		}
+	}
 	s.Scan()
 	var content string
 	for s.Scan() {
@@ -95,13 +113,38 @@ func RenderIndexPage() {
 
 }
 
-func RenderPostPage(post BlogPost) string {
-	var b strings.Builder
+//go:embed templates/base.tmpl
+var BaseTmpl string
 
-	b.WriteString("Post page!\n")
-	b.WriteString(post.Title + "\n" + post.Date + "\n" + post.Tags + "\n")
-	b.WriteString("\n" + post.Content)
+//go:embed templates/index.tmpl
+var IndexTmpl string
 
+//go:embed templates/post.tmpl
+var PostTmpl string
+
+type Templates struct {
+	Base, Index, Post *template.Template
+}
+
+func RenderPostPage(post BlogPost, ts Templates) string {
+	b := &strings.Builder{}
+	p := &strings.Builder{}
+	ts.Post.Execute(p, struct {
+		Title, Date, Content string
+		Tags                 []string
+	}{
+		post.Title,
+		post.Date,
+		post.Content,
+		post.Tags,
+	})
+	post_content := template.HTML(p.String())
+	ts.Base.Execute(b, struct {
+		Title       string
+		PageContent template.HTML
+	}{
+		post.Title, post_content,
+	})
 	return b.String()
 }
 
