@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	_ "embed"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
@@ -22,6 +24,7 @@ func main() {
 	post_t = template.Must(post_t.Parse(PostTmpl))
 
 	templates := Templates{base_t, index_t, post_t}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -29,7 +32,17 @@ func main() {
 	})
 
 	mux.HandleFunc("/index/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Index page!"))
+		posts := GetAllPosts()
+		slices.SortFunc(posts, func(i, j BlogPost) int {
+			if i.Date.After(j.Date) {
+				return -1
+			}
+			if i.Date.Before(j.Date) {
+				return 1
+			}
+			return 0
+		})
+		w.Write([]byte(RenderIndexPage(posts, templates)))
 	})
 
 	mux.HandleFunc("/post/", func(w http.ResponseWriter, r *http.Request) {
@@ -61,10 +74,11 @@ func main() {
 }
 
 type BlogPost struct {
-	Title   string
-	Date    string
-	Tags    []string
-	Content string
+	Title    string
+	Filename string
+	Date     time.Time
+	Tags     []string
+	Content  string
 }
 
 func OpenBlogPost(filename string) (BlogPost, error) {
@@ -98,19 +112,36 @@ func OpenBlogPost(filename string) (BlogPost, error) {
 	}
 	s.Scan()
 	var content string
+	var text string
+	s.Scan()
+	text = s.Text()
 	for s.Scan() {
-		content += s.Text() + "\n"
+		content += text + "\n<br>\n"
+		text = s.Text()
+	}
+	if text != "" {
+		content += text
 	}
 
 	if s.Err() != nil {
 		return BlogPost{}, err
 	}
 
-	return BlogPost{title, date, tags, content}, nil
+	t, err := time.Parse("1/2/2006", date)
+	if err != nil {
+		return BlogPost{}, err
+	}
+	return BlogPost{title, filename, t, tags, content}, nil
 }
 
-func RenderIndexPage() {
-
+// TODO properly
+func GetAllPosts() []BlogPost {
+	// var entries []string
+	// filepath.WalkDir("./blog/")
+	b1, _ := OpenBlogPost("test_post")
+	b2, _ := OpenBlogPost("test_2")
+	b3, _ := OpenBlogPost("test_3")
+	return []BlogPost{b1, b2, b3}
 }
 
 //go:embed templates/base.tmpl
@@ -129,23 +160,60 @@ type Templates struct {
 func RenderPostPage(post BlogPost, ts Templates) string {
 	b := &strings.Builder{}
 	p := &strings.Builder{}
+	date_string := RenderDateString(post.Date)
 	ts.Post.Execute(p, struct {
-		Title, Date, Content string
-		Tags                 []string
+		Title   string
+		Date    string
+		Content template.HTML
+		Tags    []string
 	}{
 		post.Title,
-		post.Date,
-		post.Content,
+		date_string,
+		template.HTML(post.Content),
 		post.Tags,
 	})
-	post_content := template.HTML(p.String())
+	page_content := template.HTML(p.String())
 	ts.Base.Execute(b, struct {
 		Title       string
 		PageContent template.HTML
 	}{
-		post.Title, post_content,
+		post.Title, page_content,
 	})
 	return b.String()
+}
+
+func RenderIndexPage(posts []BlogPost, ts Templates) string {
+	b := &strings.Builder{}
+	p := &strings.Builder{}
+	type post_data struct {
+		PostLink, PostTitle, PostDate string
+	}
+	var data []post_data
+	for _, post := range posts {
+		data = append(data, post_data{
+			PostLink:  post.Filename,
+			PostTitle: post.Title,
+			PostDate:  RenderDateString(post.Date),
+		})
+	}
+	ts.Index.Execute(p, data)
+	page_content := template.HTML(p.String())
+	ts.Base.Execute(b, struct {
+		Title       string
+		PageContent template.HTML
+	}{
+		"BlogSoft", page_content,
+	})
+
+	return b.String()
+}
+
+func RenderDateString(date time.Time) string {
+	date_string := fmt.Sprintf(
+		"%d/%d/%d",
+		date.Month(), date.Day(), date.Year(),
+	)
+	return date_string
 }
 
 type Cacher interface {

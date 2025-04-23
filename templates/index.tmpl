@@ -1,0 +1,7 @@
+<h2>Welcome to BlogSoft!</h2>
+<hr>
+<p>Available Posts:</p>
+{{range .}}
+<a href="/post/{{.PostLink}}">{{.PostTitle}}</a> | {{.PostDate}}
+<br>
+{{end}}

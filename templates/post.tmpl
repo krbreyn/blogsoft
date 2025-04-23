@@ -1,11 +1,13 @@
-<h1>{{.Title}}</h1>
-<h3>{{.Date}}</h3>
+<h2>{{.Title}}</h1>
+<p>Date Published: {{.Date}}</p>
+<hr>
+<p>
+{{.Content}}
+</p>
+
+<hr>
 {{if .Tags -}}
 <p>
 Tags: {{range $index, $tag := .Tags}}{{if $index}}, {{end}}{{$tag}}{{end}}
 </p>
 {{end}}
-<hr>
-<p>
-{{.Content}}
-</p>
