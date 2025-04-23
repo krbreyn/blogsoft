@@ -13,6 +13,19 @@ import (
 	"time"
 )
 
+//go:embed templates/base.tmpl
+var BaseTmpl string
+
+//go:embed templates/index.tmpl
+var IndexTmpl string
+
+//go:embed templates/post.tmpl
+var PostTmpl string
+
+type Templates struct {
+	Base, Index, Post *template.Template
+}
+
 //var blog_dir = os.Getenv("BLOG_DIR")
 
 func main() {
@@ -142,19 +155,6 @@ func GetAllPosts() []BlogPost {
 	b2, _ := OpenBlogPost("test_2")
 	b3, _ := OpenBlogPost("test_3")
 	return []BlogPost{b1, b2, b3}
-}
-
-//go:embed templates/base.tmpl
-var BaseTmpl string
-
-//go:embed templates/index.tmpl
-var IndexTmpl string
-
-//go:embed templates/post.tmpl
-var PostTmpl string
-
-type Templates struct {
-	Base, Index, Post *template.Template
 }
 
 func RenderPostPage(post BlogPost, ts Templates) string {
