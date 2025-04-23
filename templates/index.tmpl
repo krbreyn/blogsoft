@@ -2,6 +2,8 @@
 <hr>
 <p>Available Posts:</p>
 {{range .}}
-<a href="/post/{{.PostLink}}">{{.PostTitle}}</a> | {{.PostDate}}
+<a href="/post/{{.PostLink}}">{{.PostTitle}}</a>
+<br>
+&emsp;{{.PostDate}}
 <br>
 {{end}}
