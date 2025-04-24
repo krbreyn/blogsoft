@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -16,14 +17,28 @@ import (
 //go:embed templates/base.tmpl
 var BaseTmpl string
 
-//go:embed templates/index.tmpl
-var IndexTmpl string
-
 //go:embed templates/post.tmpl
 var PostTmpl string
 
 type Templates struct {
-	Base, Index, Post *template.Template
+	Base, Post *template.Template
+}
+
+type BlogStore interface {
+	Get(fillename string) (BlogPost, error)
+	GetAll() ([]BlogPost, error)
+	GetLastN(n int) ([]BlogPost, error)
+}
+
+type Cacher interface {
+	Is(name string) bool
+	Get(name string) BlogPost
+	Put(name string) BlogPost
+}
+
+type BlogServer struct {
+	s BlogStore
+	c Cacher
 }
 
 //var blog_dir = os.Getenv("BLOG_DIR")
@@ -31,12 +46,10 @@ type Templates struct {
 func main() {
 	base_t := template.New("base")
 	base_t = template.Must(base_t.Parse(BaseTmpl))
-	index_t := template.New("index")
-	index_t = template.Must(index_t.Parse(IndexTmpl))
 	post_t := template.New("post")
 	post_t = template.Must(post_t.Parse(PostTmpl))
 
-	templates := Templates{base_t, index_t, post_t}
+	templates := Templates{base_t, post_t}
 
 	mux := http.NewServeMux()
 
@@ -45,29 +58,19 @@ func main() {
 	})
 
 	mux.HandleFunc("/index/", func(w http.ResponseWriter, r *http.Request) {
-		posts := GetAllPosts()
-		slices.SortFunc(posts, func(i, j BlogPost) int {
-			if i.Date.After(j.Date) {
-				return -1
-			}
-			if i.Date.Before(j.Date) {
-				return 1
-			}
-			return 0
-		})
-		w.Write([]byte(RenderIndexPage(posts, templates)))
+		_, _ = w.Write([]byte(RenderIndexPage(templates)))
 	})
 
 	mux.HandleFunc("/post/", func(w http.ResponseWriter, r *http.Request) {
 		target_post := strings.TrimPrefix(r.URL.Path, "/post/")
 		post, err := OpenBlogPost(target_post)
 		if err != nil {
-			w.Write([]byte(target_post))
-			w.Write([]byte(err.Error()))
+			_, _ = w.Write([]byte(target_post))
+			_, _ = w.Write([]byte(err.Error()))
 			http.NotFound(w, r)
 			return
 		}
-		w.Write([]byte(RenderPostPage(post, templates)))
+		_, _ = w.Write([]byte(RenderPostPage(post, templates)))
 	})
 
 	srv := &http.Server{
@@ -96,7 +99,6 @@ type BlogPost struct {
 
 func OpenBlogPost(filename string) (BlogPost, error) {
 	path := "./blog/" + filename + ".sbmd"
-
 	_, err := os.Stat(path)
 	if err != nil {
 		return BlogPost{}, err
@@ -147,6 +149,51 @@ func OpenBlogPost(filename string) (BlogPost, error) {
 	return BlogPost{title, filename, t, tags, content}, nil
 }
 
+func OpenIndex() (string, error) {
+	path := "./blog/index.sbmd"
+	_, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	s := bufio.NewScanner(strings.NewReader(string(file)))
+	var ret string
+	for s.Scan() {
+		text := s.Text()
+		if strings.HasPrefix(text, "[[blog_last_x") && strings.HasSuffix(text, "]]") {
+			split := strings.Fields(text)
+			if len(split) == 2 {
+				no, err := strconv.Atoi(strings.TrimSuffix(strings.Fields(text)[1], "]]"))
+				if err == nil {
+					text = BlogLastX(no)
+				}
+			}
+		}
+		ret += text + "\n"
+	}
+	return ret, nil
+}
+
+func GetStyle() template.CSS {
+	path := "./blog/style.css"
+	_, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+
+	return template.CSS(string(file))
+}
+
 // TODO properly
 func GetAllPosts() []BlogPost {
 	// var entries []string
@@ -157,11 +204,37 @@ func GetAllPosts() []BlogPost {
 	return []BlogPost{b1, b2, b3}
 }
 
+func BlogLastX(no int) string {
+	// lazy, unoptimized
+	// TODO open each file one by one and just check the date
+
+	posts := GetAllPosts()
+	slices.SortFunc(posts, func(i, j BlogPost) int {
+		if i.Date.After(j.Date) {
+			return -1
+		}
+		if i.Date.Before(j.Date) {
+			return 1
+		}
+		return 0
+	})
+	l := min(len(posts), no)
+	posts = posts[:l]
+	var ret string
+	for _, p := range posts {
+		ret += fmt.Sprintf(`<a href="/post/%s">%s</a><br>`, p.Filename, p.Title)
+		ret += "&emsp;"
+		ret += RenderDateString(p.Date)
+		ret += "<br>\n"
+	}
+	return ret
+}
+
 func RenderPostPage(post BlogPost, ts Templates) string {
 	b := &strings.Builder{}
 	p := &strings.Builder{}
 	date_string := RenderDateString(post.Date)
-	ts.Post.Execute(p, struct {
+	_ = ts.Post.Execute(p, struct {
 		Title   string
 		Date    string
 		Content template.HTML
@@ -173,37 +246,38 @@ func RenderPostPage(post BlogPost, ts Templates) string {
 		post.Tags,
 	})
 	page_content := template.HTML(p.String())
-	ts.Base.Execute(b, struct {
+	_ = ts.Base.Execute(b, struct {
 		Title       string
 		PageContent template.HTML
+		StyleSheet  template.CSS
 	}{
-		post.Title, page_content,
+		post.Title, page_content, GetStyle(),
 	})
 	return b.String()
 }
 
-func RenderIndexPage(posts []BlogPost, ts Templates) string {
+func RenderIndexPage(ts Templates) string {
 	b := &strings.Builder{}
-	p := &strings.Builder{}
-	type post_data struct {
-		PostLink, PostTitle, PostDate string
-	}
-	var data []post_data
-	for _, post := range posts {
-		data = append(data, post_data{
-			PostLink:  post.Filename,
-			PostTitle: post.Title,
-			PostDate:  RenderDateString(post.Date),
+	index, err := OpenIndex()
+	// hack?
+	// TODO CHECK TEMPLATES FOR ERRORS
+	if err == nil {
+		_ = ts.Base.Execute(b, struct {
+			Title       string
+			PageContent template.HTML
+			StyleSheet  template.CSS
+		}{
+			"BlogSoft", template.HTML(index), GetStyle(),
+		})
+	} else {
+		_ = ts.Base.Execute(b, struct {
+			Title       string
+			PageContent template.HTML
+			StyleSheet  template.CSS
+		}{
+			"BlogSoft", template.HTML("no index page found"), GetStyle(),
 		})
 	}
-	ts.Index.Execute(p, data)
-	page_content := template.HTML(p.String())
-	ts.Base.Execute(b, struct {
-		Title       string
-		PageContent template.HTML
-	}{
-		"BlogSoft", page_content,
-	})
 
 	return b.String()
 }
@@ -214,10 +288,4 @@ func RenderDateString(date time.Time) string {
 		date.Month(), date.Day(), date.Year(),
 	)
 	return date_string
-}
-
-type Cacher interface {
-	Is(name string) bool
-	Get(name string) BlogPost
-	Put(name string) BlogPost
 }

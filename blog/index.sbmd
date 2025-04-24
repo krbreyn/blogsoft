@@ -1,0 +1,5 @@
+<h2>Welcome to BlogSoft!</h2>
+<hr>
+<br>
+<p>Recent Posts:</p>
+[[blog_last_x 5]]
