@@ -98,7 +98,7 @@ type BlogPost struct {
 }
 
 func OpenBlogPost(filename string) (BlogPost, error) {
-	path := "./blog/" + filename + ".sbmd"
+	path := "./blog/" + filename + ".sbml"
 	_, err := os.Stat(path)
 	if err != nil {
 		return BlogPost{}, err
@@ -150,7 +150,7 @@ func OpenBlogPost(filename string) (BlogPost, error) {
 }
 
 func OpenIndex() (string, error) {
-	path := "./blog/index.sbmd"
+	path := "./blog/index.sbml"
 	_, err := os.Stat(path)
 	if err != nil {
 		return "", err
