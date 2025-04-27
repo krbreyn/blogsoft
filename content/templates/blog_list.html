@@ -1,0 +1,7 @@
+{{range .Posts}}
+
+<a href="/blog/{{.Filename}}">{{.Title}}</a><br>&emsp;{{.DateRepr}}<br>
+
+{{else}}
+<p>No posts!!</p>
+{{end}}
