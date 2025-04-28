@@ -14,7 +14,6 @@ type BlogPost struct {
 	Filename string
 	Date     time.Time
 	DateRepr string
-	Tags     []string
 	Content  string
 }
 
@@ -41,16 +40,6 @@ func (s *BlogStore) GetBlog(name string) (BlogPost, error) {
 	scanner.Scan()
 	date := scanner.Text()
 	scanner.Scan()
-	var tags []string
-	tag_line := scanner.Text()
-	if tag_line != "" {
-		str := strings.TrimPrefix(tag_line, "[[tags: ")
-		if str != tag_line {
-			str := strings.TrimSuffix(str, "]]")
-			tags = strings.Fields(str)
-		}
-	}
-	scanner.Scan()
 	var content string
 	var text string
 	scanner.Scan()
@@ -71,7 +60,7 @@ func (s *BlogStore) GetBlog(name string) (BlogPost, error) {
 	if err != nil {
 		return BlogPost{}, err
 	}
-	return BlogPost{title, name, t, RenderDateString(t), tags, content}, nil
+	return BlogPost{title, name, t, RenderDateString(t), content}, nil
 
 }
 

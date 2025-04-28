@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// TODO tags
-
 type BlogServer struct {
 	s *BlogStore
 }
@@ -67,12 +65,10 @@ func (b *BlogServer) RenderBlogPost(name string) (string, error) {
 		Title   string
 		Date    string
 		Content template.HTML
-		Tags    []string
 	}{
 		blog_post.Title,
 		date_string,
 		template.HTML(blog_post.Content),
-		blog_post.Tags,
 	})
 	if err != nil {
 		return "", err
