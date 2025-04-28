@@ -115,7 +115,7 @@ func main() {
 	}
 	port, err := strconv.Atoi(os.Args[1])
 	if err != nil {
-		fmt.Println(err.Error)
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 	port_str := ":" + strconv.Itoa(port)
