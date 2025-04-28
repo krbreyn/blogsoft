@@ -6,6 +6,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -107,6 +109,17 @@ func (b *BlogServer) RenderBlogList() (string, error) {
 }
 
 func main() {
+	if len(os.Args) != 2 {
+		fmt.Println("port must be provided")
+		os.Exit(1)
+	}
+	port, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		fmt.Println(err.Error)
+		os.Exit(1)
+	}
+	port_str := ":" + strconv.Itoa(port)
+
 	mux := http.NewServeMux()
 
 	serv := BlogServer{&BlogStore{}}
@@ -163,7 +176,7 @@ func main() {
 	})
 
 	srv := &http.Server{
-		Addr:              ":8080",
+		Addr:              port_str,
 		Handler:           mux,
 		ReadTimeout:       30 * time.Second,
 		ReadHeaderTimeout: 30 * time.Second,
