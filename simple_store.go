@@ -66,12 +66,24 @@ func (s *BlogStore) GetBlog(name string) (BlogPost, error) {
 
 // TODO properly
 func (s *BlogStore) GetAllBlogs() ([]BlogPost, error) {
-	// var entries []string
+	var entries []BlogPost
 	// filepath.WalkDir("./blog/")
-	b1, _ := s.GetBlog("test_post")
-	b2, _ := s.GetBlog("test_2")
-	b3, _ := s.GetBlog("test_3")
-	return []BlogPost{b1, b2, b3}, nil
+	dir, err := os.ReadDir("./content/blog")
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range dir {
+		if e.IsDir() {
+			continue
+		}
+		blog, err := s.GetBlog(strings.TrimSuffix(e.Name(), ".blog"))
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, blog)
+	}
+
+	return entries, nil
 }
 
 func (s *BlogStore) GetLastNBlogs(no int) ([]BlogPost, error) {
