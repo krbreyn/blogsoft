@@ -18,6 +18,7 @@ type BlogPost struct {
 	Content  string
 }
 
+// TODO
 type Cacher struct {
 }
 
@@ -27,10 +28,6 @@ type BlogStore struct {
 
 func (s *BlogStore) GetBlog(name string) (BlogPost, error) {
 	path := "./content/blog/" + name + ".blog"
-	_, err := os.Stat(path)
-	if err != nil {
-		return BlogPost{}, err
-	}
 
 	file, err := os.ReadFile(path)
 	if err != nil {

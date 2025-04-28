@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+// TODO tags
+
 type BlogServer struct {
 	s *BlogStore
 }
